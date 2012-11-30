@@ -89,14 +89,172 @@
 
 (define *rule-env* (initialize-rule-env (make-env)))
 
-(define (cfdg-compile rules env renv)
-  ;; need to define this
-)
+;;; clamps v between n and x (inclusive)
+(define (clamp v n x)
+  (cond
+   ((> v x) x)
+   ((< v n) n)
+   (else v)))
+
+;;; Wraps calls to operators in push and pop operations
+;;; and inserts surface into the first positional argument
+;;; of the operations to be called
+(define-syntax call-with-current-surface
+  (syntax-rules ()
+    ((_ surf (op args ...) ...)
+     (begin 
+       (push surf)
+       (apply op (cons surf '(args ...))) ...
+       (pop)))))
+
+;;; Ensures colors and rotations are setup correctly
+(define-syntax with-current-env
+  (syntax-rules ()
+    ((_ (surf env) body ...)
+     (let ((b (cadr (assoc 'b env)))
+           (c (cadr (assoc 'c env)))
+           (t (cadr (assoc 't env)))
+           (a (cadr (assoc 'a env)))
+           (r (cadr (assoc 'r env))))
+       ;;; (cairo-rotate surf r) x, y get changed on set of x and y
+       (apply cairo-set-source-rgba (list surf ,@(hsl->rgb c t b) a))))))
+
+;;; Draws a filled-circle on surf given current env params
+(define (cfdg-circle surf env)
+  (with-current-env (surf env)
+     (let ((x (cadr (assoc 'x env)))
+           (y (cadr (assoc 'y env)))
+           (s (cadr (assoc 's env))))
+       (cairo-fill surf)
+       (cairo-arc surf x y (/ s 2) 0.0 (* 2 *pi*))))
+
+;;; Draws a filled-square on surf given current env params
+(define (cfdg-square surf env)
+  (with-current-env (surf env)
+     (let ((x (cadr (assoc 'x env)))
+           (y (cadr (assoc 'y env)))
+           (s (cadr (assoc 's env))))
+       (cairo-fill surf)
+       (cairo-rect surf x y s s))))
+
+;;; Draws an open-square on surf given current env params
+(define (cfdg-rect surf env)
+  (with-current-env (surf env)
+     (let ((x (cadr (assoc 'x env)))
+           (y (cadr (assoc 'y env)))
+           (s (cadr (assoc 's env))))
+       (cairo-stroke surf)
+       (cairo-rect surf x y s s))))
+
+;;; Draws a line on surface given current params
+(define (cfdg-line surf env)
+  (with-current-env env
+    (let ((x (cadr (assoc 'x env)))
+          (y (cadr (assoc 'y env)))
+          (s (cadr (assoc 's env))))
+      (cairo-line-to surf (+ x s) (+ y s)))))
+
+
+; X (x-coord) 	0 to image width 	depends on scaling 	any 	old_x + s*(x*cos(r)-y*sin(r)) 	Horisontal shift.
+; Y (y-coord) 	0 to image height 	depends on scaling 	any 	old_y + s*(y*cos(r)+x*sin(r)) 	Vertical shift.
+(define *cfdg-parameter-adjustments*
+  (list
+   ('a (lambda (old-a a)
+         (clamp (if (> a 0)
+                    (+ old-a (* a (- 255 old-a)))
+                    (+ old-a (* a old-a)))) 0 255))
+   ('b (lambda (old-b b)
+         (clamp (if (> b 0)
+                    (+ old-b (* b (- 255 old-b)))
+                    (+ old-b (* b old-b)))) 0 255))
+   ('c (lambda (old-c c)
+         (clamp (+ old-c c) 0 255)))
+   ('r (lambda (old-r r)
+         (+ old-r r)))
+   ('s (lambda (old-s s)
+         (let ((ns (* old-s s)))
+           (if (<= 0 ns)
+               0.0001
+               ns))))
+   ('t (lambda (old-t t)
+         (clamp (+ old-t t) 0 255)))
+   ('x (lambda (old-x x s r width)
+         (clamp 
+          (+ old-x (* s (+ (* x (cos r)) (* y (sin r)))))
+          0 width)))
+   ('y (lambda (old-y y s r height)
+         (clamp
+          (+ old-y (* s (+ (* y (cos r)) (* x (sin r)))))
+          0 height)))))
+
+       
+;;; Extend and update the environment parameters
+(define (cfdg-extend-env env . params)
+  (let ((cx (assoc 'x env))
+        (cy (assoc 'y env))
+        (cw (assoc 'width env))
+        (ch (assoc 'height env))
+        (cr (assoc 'r env))
+        (cs (assoc 's env)))
+    (fold (lambda (p env)
+            (let* ((old (assoc (car p) env))
+                   (fun (assoc (car p) *cfdg-parameter-adjustments*)))
+              ; TODO replace!
+              (cond
+               ((eq? 'x (car p))
+                (cons (list (car p) (apply (map cadr (list cx p cs cr cw))) '()) env))
+               ((eq? 'y (car p))
+                (cons (list (car p) (apply (map cadr (list cy p cs cr ch))) '()) env))
+               (else
+                (cons (list (car p) (apply (map cadr (list old p)))) env))))))))
+          
+;;; I want this to create a new function `four-circles`
+;;; which runs the sketch with CFDG semantics
+;; (define-sketch four-circles
+;;   (w 1000)
+;;   (h 1000)
+;;   (rule circles
+;;         (four-circles)
+;;         (square))
+;;   (rule four-circles
+;;         (CIRCLE (x 1.5) (s 0.7))
+;;         (CIRCLE (x -1.5) (s 0.7))
+;;         (CIRCLE (y 1.5) (s 0.7))
+;;         (CIRCLE (y -1.5) (s 0.7))
+;;         (four-circles (x 1.5 s 0.5))
+;;         (four-circles (x -1.5 s 0.5))
+;;         (four-circles (y 1.5 s 0.5))
+;;         (four-circles (y -1.5 s 0.5)))
+
+;;   (start-rule 'circles))
+
+;;; This is likely output
+;; (define (four-circles)
+;;   (define (rule-circles surf env n)
+;;     (if (not (= 0 n))
+;;        (begin
+;;           (call-with-current-surface surf (rule-four-circles env (- n 1)) 
+;;           (call-with-current-surface surf (square))))
+;;   (define (rule-four-circles surf env n)
+;;     (cfdg-circle surf (extend-env env '(x 1.5) '(s 0.7)))
+;;     (cfdg-circle surf (extend-env env '(x -1.5) '(s 0.7)))
+;;     (cfdg-circle surf (extend-env env '(y 1.5) '(s 0.7)))
+;;     (cfdg-circle surf (extend-env env '(y -1.5) '(s 0.7)))
+;;     (rule-four-circles surf (extend-env env '(x 1.5) '(s 0.5)))
+;;     (rule-four-circles surf (extend-env env '(x -1.5) '(s 0.5)))
+;;     (rule-four-circles surf (extend-env env '(y 1.5) '(s 0.5)))
+;;     (rule-four-circles surf (extend-env env '(y -1.5) '(s 0.5))))
+
+;;   (let ((cr (create 500 500))
+;;         (env (make-env)))
+;;     (rule-circles cr env)))
+
+  
 
 ;; (rule circles
 ;;   (four-circles)
-;;   (SQUARE))
-
+;;   (square))
+;;
 ;; (rule four-circles
 ;;   (CIRCLE (x 1.5) (s 0.7))
 ;;   (CIRCLE (x -1.5) (s 0.7))
@@ -108,9 +266,6 @@
 ;;   (four-circles (y -1.5 s 0.5)))
 
 ;; (start-rule 'circles)
-
-
-
 
 ;; (width 400)
 ;; (height 400)
