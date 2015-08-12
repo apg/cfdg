@@ -48,7 +48,7 @@
       (values (/ h 6) s l))]))
 
 (define (compute-color ctx)
-  (define-values [r g b] (hsl->rgb (/ (context-color ctx) 255)
-                                   (/ (context-saturation ctx) 255)
-                                   (/ (context-brightness ctx) 255)))
-  (make-color r g b (context-alpha ctx)))
+  (define-values [r g b] (hsl->rgb (/ (clamp (context-hue ctx) #:max 360 #:min 0) 360)
+                                   (/ (clamp (context-saturation ctx) #:max 100 #:min 0) 100)
+                                   (/ (clamp (context-luminance ctx) #:max 100 #:min 0) 100)))
+  (make-color r g b (/ (context-alpha ctx) 100)))
