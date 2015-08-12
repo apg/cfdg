@@ -1,3 +1,10 @@
+* General
+  - refactor primitives
+    - [X] circle
+    - [X] square
+    - [X] rect
+    - [X] line
+
 * Starting context params
   - [ ] output filename (take as command line arg?)
   - [ ] Width, Height

@@ -19,100 +19,80 @@
                      #%module-begin)
          (rename-out [cfdg-module-begin #%module-begin]))
 
+(define (set-pen-brush-properties!
+         color
+         #:brush [brush 'transparent]
+         #:pen [pen 'transparent]
+         #:pen-size [pen-size 0])
+  (send (current-dc) set-smoothing 'aligned)
+  (send (current-dc) set-brush color brush)
+  (send (current-dc) set-pen color pen-size pen))
+
+;;; x0, y0 represents the old point.
+(define (compute-point x0 y0 x1 y1 size rot)
+  (cons (+ x0
+           (* size
+              (- (* x1 (cos rot))
+                 (* y1 (sin rot)))))
+        (+ y0
+           (* size
+              (+ (* y1 (cos rot))
+                 (* x1 (sin rot)))))))
+
+
+;;; standard primitives
+
 (define (circle . params)
-  (define dc (current-dc))
-  (define ctx (current-context))
-  (define ctx* (context-update ctx params))
+  (define ctx* (context-update (current-context) params))
   (define new-size (context-size ctx*))
   (define half-size (/ new-size 2))
-  (define top-left-x (- (context-x ctx*) half-size))
-  (define top-left-y (- (context-y ctx*) half-size))
-  (send dc set-brush (compute-color ctx*) 'solid)
-  (send dc set-smoothing 'aligned)
-  (send dc set-pen "black" 0 'transparent)
-                                        ;  (send dc draw-ellipse top-left-x top-left-y half-size half-size)
-  (send dc draw-ellipse top-left-x top-left-y new-size new-size)
+  (set-pen-brush-properties! (compute-color ctx*) #:brush 'solid)
+  (send (current-dc)
+        draw-ellipse
+        (- (context-x ctx*) half-size)
+        (- (context-y ctx*) half-size)
+        new-size
+        new-size)
   ctx*)
 
 (define (line . params)
-  (define dc (current-dc))
-  (define ctx (current-context))
-  (define old-x (context-x ctx))
-  (define old-y (context-y ctx))
-  (define ctx* (context-update ctx params))
-  (define new-rot (context-rotation ctx*))
-  (define new-size (context-size ctx*))
-  (define (compute-point x y)
-    (cons (+ old-x
-             (* new-size
-                (- (* x (cos new-rot))
-                   (* y (sin new-rot)))))
-          (+ old-y
-             (* new-size
-                (+ (* y (cos new-rot))
-                   (* x (sin new-rot)))))))
-  (define endpt (compute-point (context-x ctx*) (context-y ctx*)))
-
-  (send dc set-brush (compute-color ctx*) 'transparent)
-  (send dc set-smoothing 'aligned)
-  (send dc set-pen (compute-color ctx*) 1 'solid)
-  (send dc draw-line (context-x ctx*) (context-y ctx*) (car endpt) (cdr endpt))
-
+  (define ctx* (context-update (current-context) params))
+  (define endpt (compute-point (context-x (current-context))
+                               (context-y (current-context))
+                               (context-x ctx*)
+                               (context-y ctx*)
+                               (context-size ctx*)
+                               (context-rotation ctx*)))
+  (set-pen-brush-properties! (compute-color ctx* #:pen 'solid #:pen-size 1))
+  (send (current-dc) draw-line (context-x ctx*) (context-y ctx*) (car endpt) (cdr endpt))
   ctx*)
 
-(define (square . params)
-  (define dc (current-dc))
-  (define ctx (current-context))
-  (define old-x (context-x ctx))
-  (define old-y (context-y ctx))
-  (define ctx* (context-update ctx params))
-  (define new-rot (context-rotation ctx*))
-  (define new-size (context-size ctx*))
-  (define (compute-point x y)
-    (cons (+ old-x
-             (* new-size
-                (- (* x (cos new-rot))
-                   (* y (sin new-rot)))))
-          (+ old-y
-             (* new-size
-                (+ (* y (cos new-rot))
-                   (* x (sin new-rot)))))))
-  (send dc set-pen "black" 0 'transparent)
-  (send dc set-brush (compute-color ctx*) 'solid)
-  (send dc set-smoothing 'aligned)
-  (send dc draw-polygon (map compute-point '(-1 1 1 -1) '(-1 -1 1 1)))
-  ctx*)
 
-(define (rect . params)
-  (define dc (current-dc))
-  (define ctx (current-context))
-  (define old-x (context-x ctx))
-  (define old-y (context-y ctx))
-  (define ctx* (context-update ctx params))
-  (define new-rot (context-rotation ctx*))
-  (define new-size (context-size ctx*))
-  (define (compute-point x y)
-    (cons (+ old-x
-             (* new-size
-                (- (* x (cos new-rot))
-                   (* y (sin new-rot)))))
-          (+ old-y
-             (* new-size
-                (+ (* y (cos new-rot))
-                   (* x (sin new-rot)))))))
-  (send dc set-pen (compute-color ctx*) 1 'solid)
-  (send dc set-brush (compute-color ctx*) 'transparent)
-  (send dc set-smoothing 'aligned)
-  (send dc draw-polygon (map compute-point '(-1 1 1 -1) '(-1 -1 1 1)))
-  ctx*)
+(define ((make-quad #:brush [brush 'transparent]
+                    #:pen [pen 'transparent]
+                    #:pen-size [pen-size 0]) . params)
+  (define ctx* (context-update (current-context) params))
+  (set-pen-brush-properties! (compute-color ctx*) #:brush brush #:pen pen #:pen-size pen-size)
+  (send (current-dc)
+        draw-polygon
+        (let ([x0 (context-x (current-context))]
+              [y0 (context-y (current-context))]
+              [new-rot (context-rotation ctx*)]
+              [new-size (context-size ctx*)])
+          (map (lambda (x y)
+                 (compute-point x0 y0 x y new-size new-rot))
+               '(-1 1 1 -1) '(-1 -1 1 1)))))
 
+(define square (make-quad #:brush 'solid))
+(define rect (make-quad #:pen 'solid #:pen-size 1))
+
+;;; rule set
 (struct rule-set (name total rules) #:mutable)
-
 
 (define-syntax-rule (start-rule rule params ...)
   (let ([target (make-bitmap 500 500)])
     (parameterize ([current-dc (new bitmap-dc% [bitmap target])]
-                   [current-context (context 250 250 1 0 255 255 500 500 0 50 4)])
+                   [current-context (context 250 250 100 0 0 0 500 500 0 50 10)])
       (begin
         (rule params ...)
         (send target save-file "out.png" 'png)))))
@@ -158,6 +138,7 @@
     [(_ name forms ...) #'(rule (name 1.0) forms ...)]))
 
 
+;;; parameters for important things.
 (define current-dc (make-parameter 'empty-dc))
 (define current-context (make-parameter 'empty-context))
 (define current-rule-set (make-parameter (make-hasheq)))
