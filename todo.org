@@ -20,4 +20,4 @@
   - [ ] Potentially do multiple passes to optimally order, to avoid undefined errors.
 
 * Add todo list
-  - [ ] Remove top level checkboxes
+  - [X] Remove top level checkboxes
