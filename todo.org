@@ -1,14 +1,16 @@
-* [ ] Starting context params
+* Starting context params
   - [ ] output filename (take as command line arg?)
   - [ ] Width, Height
   - [ ] Initial X, Y
   - [ ] Nesting
   - [ ] Initial Hue, Saturation, Luminance
 
-* [ ] Enhancements
+* Enhancements
   - [ ] Support absolute context adjustments, and potentially function calls for adjustments.
   - [ ] Could in theory define our own functions to call for context updates as well.
 
-* [ ] CFDG parser / compiler
+* CFDG parser / compiler
   - [ ] Potentially do multiple passes to optimally order, to avoid undefined errors.
 
+* Add todo list
+  - [ ] Remove top level checkboxes
