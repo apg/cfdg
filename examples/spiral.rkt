@@ -4,9 +4,9 @@
 (set width 1000)
 (set height 1000)
 (set size 50)
-(set luminance 220)
+(set luminance 80)
 (set rotation 0)
-(set saturation 200)
+(set saturation 90)
 (set nesting 100)
 (set alpha 0)
 
