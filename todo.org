@@ -4,20 +4,28 @@
     - [X] square
     - [X] rect
     - [X] line
+  - Contracts
+  - Normalize on context names
+  - Probabilistic routes (duplicate top level define right now)
 
 * Starting context params
-  - [ ] output filename (take as command line arg?)
-  - [ ] Width, Height
-  - [ ] Initial X, Y
-  - [ ] Nesting
-  - [ ] Initial Hue, Saturation, Luminance
+  - [ ] output filename (potentially take as command line arg, or new parameter?)
+  - [X] Width, Height
+  - [X] Initial X, Y
+  - [X] Nesting
+  - [X] Initial Hue, Saturation, Luminance
 
 * Enhancements
   - [ ] Support absolute context adjustments, and potentially function calls for adjustments.
   - [ ] Could in theory define our own functions to call for context updates as well.
+  - [ ] It is an error for `rule` to attempt to expand a parameter that is not valid in rule context.
 
 * CFDG parser / compiler
   - [ ] Potentially do multiple passes to optimally order, to avoid undefined errors.
+  - [ ] Ensure only one start-rule
 
 * Add todo list
   - [X] Remove top level checkboxes
+
+* Examples
+  - [ ] examples/ directory, port some over.

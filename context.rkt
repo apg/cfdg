@@ -9,6 +9,48 @@
   (x y alpha hue saturation luminance width height rotation size nesting)
   #:transparent)
 
+(define *default-background* "white")
+(define *default-height* 1000)
+(define *default-width* 1000)
+(define *default-alpha* 100)
+(define *default-hue* 0)
+(define *default-saturation* 0)
+(define *default-luminance* 0)
+(define *default-rotation* 0)
+(define *default-size* 10)
+(define *default-nesting* 10)
+
+(define (context-name-mapping n)
+  (case n
+    [(a) 'alpha]
+    [(c) 'hue]
+    [(t) 'saturation]
+    [(b) 'luminance]
+    [(l) 'luminance]
+    [(r) 'rotation]
+    [(s) 'size]
+    [(n) 'nesting]
+    [(w) 'width]
+    [(h) 'height]
+    [else n]))
+
+(define (initial-context params)
+  (define init-width (hash-ref params 'width *default-width*))
+  (define init-height (hash-ref params 'width *default-width*))
+  (define init-x (hash-ref params 'x (/ init-width 2)))
+  (define init-y (hash-ref params 'x (/ init-height 2)))
+  (context init-x
+           init-y
+           (hash-ref params 'alpha *default-alpha*)
+           (hash-ref params 'hue *default-hue*)
+           (hash-ref params 'saturation *default-saturation*)
+           (hash-ref params 'luminance *default-luminance*)
+           init-width
+           init-height
+           (hash-ref params 'rotation *default-rotation*)
+           (hash-ref params 'size *default-size*)
+           (hash-ref params 'nesting *default-nesting*)))
+
 (define (context-update old ps)
   (define params (apply hasheq ps))
   (define old-x (context-x old))

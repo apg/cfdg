@@ -13,6 +13,7 @@
          line
          square
          rect
+         set
          rule
          start-rule
          (except-out (all-from-out racket/base)
@@ -89,11 +90,19 @@
 ;;; rule set
 (struct rule-set (name total rules) #:mutable)
 
+(define-syntax-rule (set name value)
+  (hash-set! (current-init-params) (context-name-mapping 'name) value))
+
 (define-syntax-rule (start-rule rule params ...)
-  (let ([target (make-bitmap 500 500)])
+  (let ([background (hash-ref (current-init-params) 'background *default-background*)]
+        [target (make-bitmap
+                 (hash-ref (current-init-params) 'width *default-width*)
+                 (hash-ref (current-init-params) 'height *default-height*))])
     (parameterize ([current-dc (new bitmap-dc% [bitmap target])]
-                   [current-context (context 250 250 100 0 0 0 500 500 0 50 10)])
+                   [current-context (initial-context (current-init-params))])
       (begin
+        (send (current-dc) set-background background)
+        (send (current-dc) clear)
         (rule params ...)
         (send target save-file "out.png" 'png)))))
 
@@ -142,9 +151,10 @@
 (define current-dc (make-parameter 'empty-dc))
 (define current-context (make-parameter 'empty-context))
 (define current-rule-set (make-parameter (make-hasheq)))
+(define current-init-params (make-parameter (make-hasheq)))
 
 (define-syntax-rule (cfdg-module-begin body ...)
   (#%plain-module-begin
-   (parameterize ([current-rule-set (make-hasheq)])
-     (begin body ...)
-     )))
+   (parameterize ([current-rule-set (make-hasheq)]
+                  [current-init-params (make-hasheq)])
+     (begin body ...))))
